@@ -857,9 +857,27 @@ cdef class ServerOperation:
 
     def account(self):
         '''account() -> str
-        Client identity
+        Client identity (strict Option A)
         '''
-        return self.op.get().credentials().get().account.decode()
+        cred = self.op.get().credentials().get()
+
+        user = cred.account.decode('UTF-8')
+
+        # Hard reject: do not allow callers to present usernames containing '/'
+        if '/' in user:
+            raise ValueError("Invalid account name: '/' is not allowed")
+
+        # Only prefix when method is explicitly x509
+        try:
+            method = cred.method.decode()
+        except Exception:
+            method = ""
+
+        if method == "x509":
+            return "x509/" + user
+
+        # No prefix for non-x509 identities
+        return user
 
     def roles(self):
         '''roles() -> {str}

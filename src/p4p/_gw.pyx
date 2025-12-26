@@ -79,7 +79,24 @@ cdef class InfoBase(object):
     @property
     def account(self):
         if <bool>self.info:
-            return self.info.get().account.decode('UTF-8')
+            cred = self.info.get()
+            user = cred.account.decode('UTF-8')
+
+            # Hard reject: do not allow callers to present usernames containing '/'
+            if '/' in user:
+                raise ValueError("Invalid account name: '/' is not allowed")
+
+            # Only prefix when method is explicitly set
+            try:
+                method = cred.method.decode('UTF-8')
+            except Exception:
+                method = ""
+
+            if method == "x509":
+                return "x509/" + user
+
+            # No prefix for non-x509 identities
+            return user
         else:
             return u''
 

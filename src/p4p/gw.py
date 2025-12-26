@@ -436,6 +436,17 @@ class GWHandler(object):
     def asTest(self, op, pv=None, user=None, peer=None, roles=[]):
         if not user:
             user = op.account()
+            # Hard reject: do not allow callers to present usernames containing '/'
+            if '/' in user:
+                raise ValueError("Invalid account name: '/' is not allowed")
+            # Only prefix when method is explicitly x509
+            try:
+                method = op.method()
+            except Exception:
+                method = ""
+            if method == "x509":
+                user = "x509/" + user
+
             if not roles:
                 roles = list(op.roles())
         peer = peer or op.peer().split(':')[0]
@@ -549,8 +560,9 @@ class App(object):
         for jcli in jconf['clients']:
             name = jcli['name']
             client_conf = {
-                'EPICS_PVA_ADDR_LIST':jcli.get('addrlist',''),
-                'EPICS_PVA_AUTO_ADDR_LIST':{True:'YES', False:'NO'}[jcli.get('autoaddrlist',True)],
+                'EPICS_PVA_ADDR_LIST':jcli.get('addrlist',os.environ.get('EPICS_PVA_ADDR_LIST', '')),
+                'EPICS_PVA_AUTO_ADDR_LIST':{True:'YES', False:'NO'}[jcli.get('autoaddrlist',(os.environ.get('EPICS_PVA_AUTO_ADDR_LIST', 'YES').upper() == 'YES'))],
+                'EPICS_PVA_INTF_ADDR_LIST': jcli.get('interface', os.environ.get('EPICS_PVA_INTF_ADDR_LIST', '0.0.0.0')),
             }
             if 'bcastport' in jcli:
                 client_conf['EPICS_PVA_BROADCAST_PORT'] = str(jcli['bcastport'])
@@ -571,7 +583,7 @@ class App(object):
         # pre-process 'servers' to expand 'interface' list
         new_servers = []
         for jsrv in jconf['servers']:
-            iface = jsrv.get('interface') or ['0.0.0.0']
+            iface = jsrv.get('interface') or ['']
 
             if jver==1:
                 # version 1 only allowed one interface.
@@ -617,15 +629,23 @@ class App(object):
             providers = []
 
             server_conf = {
-                'EPICS_PVAS_INTF_ADDR_LIST':jsrv.get('interface', '0.0.0.0'),
-                'EPICS_PVAS_BEACON_ADDR_LIST':jsrv.get('addrlist', ''),
-                'EPICS_PVAS_AUTO_BEACON_ADDR_LIST':{True:'YES', False:'NO'}[jsrv.get('autoaddrlist',True)],
-                'EPICS_PVAS_IGNORE_ADDR_LIST':jsrv.get('ignoreaddr', ''),
+                'EPICS_PVA_ADDR_LIST':jsrv.get('addrlist',os.environ.get('EPICS_PVA_ADDR_LIST', '')),
+                'EPICS_PVAS_INTF_ADDR_LIST':jsrv.get('interface', os.environ.get('EPICS_PVAS_INTF_ADDR_LIST', '0.0.0.0')),
+                'EPICS_PVAS_BEACON_ADDR_LIST':jsrv.get('addrlist', os.environ.get('EPICS_PVAS_BEACON_ADDR_LIST', '')),
+                'EPICS_PVAS_AUTO_BEACON_ADDR_LIST':{True:'YES', False:'NO'}[jsrv.get('autoaddrlist',(os.environ.get('EPICS_PVAS_AUTO_BEACON_ADDR_LIST', 'YES').upper() != 'NO'))],
+                'EPICS_PVAS_IGNORE_ADDR_LIST':jsrv.get('ignoreaddr', os.environ.get('EPICS_PVAS_IGNORE_ADDR_LIST', '')),
             }
+
+            bcastport = os.environ.get('EPICS_PVAS_BROADCAST_PORT', '')
+            serverport = os.environ.get('EPICS_PVAS_SERVER_PORT', '')
             if 'bcastport' in jsrv:
                 server_conf['EPICS_PVAS_BROADCAST_PORT'] = str(jsrv['bcastport'])
+            elif bcastport != '':
+                server_conf['EPICS_PVAS_BROADCAST_PORT'] = bcastport
             if 'serverport' in jsrv:
                 server_conf['EPICS_PVAS_SERVER_PORT'] = str(jsrv['serverport'])
+            elif serverport != '':
+                server_conf['EPICS_PVAS_BROADCAST_PORT'] = serverport
 
             # pick client to use for ACF INP*
             aclient = jsrv.get('acf_client')
@@ -683,7 +703,7 @@ class App(object):
 
                 try:
                     server = Server(providers=providers,
-                                    conf=server_conf, useenv=False)
+                                    isolate=False, conf=server_conf)
                 except RuntimeError:
                     _log.exception("Unable to create server %s", pprint.pformat(server_conf))
                     sys.exit(1)
