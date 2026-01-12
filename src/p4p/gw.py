@@ -569,6 +569,21 @@ class App(object):
             if 'serverport' in jcli:
                 client_conf['EPICS_PVA_SERVER_PORT'] = str(jcli['serverport'])
 
+        # get TLS environment variables
+            pva_tls_port = os.environ.get('EPICS_PVA_TLS_PORT', '')
+            pva_keychain = os.environ.get('EPICS_PVA_TLS_KEYCHAIN', '')
+            pva_options = os.environ.get('EPICS_PVA_TLS_OPTIONS', '')
+            pva_keychain_pwd = os.environ.get('EPICS_PVA_TLS_KEYCHAIN_PWD_FILE', '')
+
+            if pva_tls_port != '':
+                client_conf['EPICS_PVA_TLS_PORT'] = pva_tls_port
+            if pva_keychain != '':
+                client_conf['EPICS_PVA_TLS_KEYCHAIN'] = pva_keychain
+            if pva_options != '':
+                client_conf['EPICS_PVA_TLS_OPTIONS'] = pva_options
+            if pva_keychain_pwd != '':
+                client_conf['EPICS_PVA_TLS_KEYCHAIN_PWD_FILE'] = pva_keychain_pwd
+
             _log.info( "Client effective configuration for %s:", name)
             for confKeys, confVals in client_conf.items():
                 _log.info( "    %s : %s", confKeys, confVals)
@@ -646,6 +661,21 @@ class App(object):
                 server_conf['EPICS_PVAS_SERVER_PORT'] = str(jsrv['serverport'])
             elif serverport != '':
                 server_conf['EPICS_PVAS_BROADCAST_PORT'] = serverport
+
+            # get TLS environment variables
+            pvas_tls_port = os.environ.get('EPICS_PVAS_TLS_PORT', '')
+            pvas_keychain = os.environ.get('EPICS_PVAS_TLS_KEYCHAIN', '')
+            pvas_options = os.environ.get('EPICS_PVAS_TLS_OPTIONS', '')
+            pvas_keychain_pwd = os.environ.get('EPICS_PVAS_TLS_KEYCHAIN_PWD_FILE', '')
+
+            if pvas_tls_port != '':
+                server_conf['EPICS_PVAS_TLS_PORT'] = pvas_tls_port
+            if pvas_keychain != '':
+                server_conf['EPICS_PVAS_TLS_KEYCHAIN'] = pvas_keychain
+            if pvas_options != '':
+                server_conf['EPICS_PVAS_TLS_OPTIONS'] = pvas_options
+            if pvas_keychain_pwd != '':
+                server_conf['EPICS_PVAS_TLS_KEYCHAIN_PWD_FILE'] = pvas_keychain_pwd
 
             # pick client to use for ACF INP*
             aclient = jsrv.get('acf_client')
